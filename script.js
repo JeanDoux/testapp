@@ -353,7 +353,7 @@ async function getNearbyUsersData(myLatitude, myLongitude) {
       );
 
       // Si l'utilisateur est à moins d'1 km de la position spécifiée, récupérer ses données d'écoute
-      if (distance < 1) {
+      if (distance < 1000) {
         const usersData = {
           userId: doc.id,
           user: userData.user,
