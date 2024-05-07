@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ma WebApp</title>
+    <link rel="stylesheet" href="styles.css"> <!-- Lien vers votre fichier CSS externe -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+</head>
+
+<body>
+    <header>
+        <div class="top-bar">
+            <div class="logo">Logo de votre application</div>
+            <div class="login-button" id="profil">
+                <a id="spotifyLink" href="#">Connexion avec Spotify</a>
+            </div>
+        </div>
+    </header>
+
+    <section class="player-section">
+        <h1>Ce que vous êtes entrain d'écouter :</h1>
+        <div id="shareButtonContainer">
+            <a>Partager</a>
+            <input type="checkbox" id="switch" /><label for="switch">Toggle</label>
+        </div>
+    </section>
+    <section>
+        <div id="currentlyPlaying">
+            <p id="noTrack"></p>
+            <img id="trackImage" src="" alt="">
+            <div id="track">
+                <a id="trackLink" target="_blank">
+                    <p id="title"></p>
+                    <p id="artist"></p>
+                </a>
+            </div>
+
+        </div> <!-- Ici seront affichées les informations sur la piste actuelle -->
+    </section>
+    <section class="others-section">
+        <h1>Ce que les gens écoutent autour de vous :</h1>
+    </section>
+    <section id="tracksList">
+
+    </section>
+
+    <footer>
+        <p>&copy; 2024 Ma WebApp. Tous droits réservés.</p>
+    </footer>
+
+    <script src="script.js" type="module"></script>
+
+</body>
+
+</html>
