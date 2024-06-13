@@ -13,7 +13,7 @@
 <body>
     <header>
         <div class="top-bar">
-            <div class="logo">Logo de votre application</div>
+            <div class="logo"><img src="Logo.png" alt="Logo de votre application"> Sharify </div>
             <div class="login-button" id="profil">
                 <a id="spotifyLink" href="#">Connexion avec Spotify</a>
             </div>
@@ -21,7 +21,29 @@
     </header>
 
     <section class="player-section">
-        <h1>Ce que vous êtes entrain d'écouter :</h1>
+        <h1>You are listening :</h1>
+        <div class="wrapper">
+            <div class="option">
+                <input class="input" type="radio" name="btn" id="option1" value="1" checked>
+                <div class="btn">
+                    <span class="span">1 km</span>
+                </div>
+            </div>
+            <div class="option">
+                <input class="input" type="radio" name="btn" id="option2" value="2">
+                <div class="btn">
+                    <span class="span">2 km</span>
+                </div>
+            </div>
+            <div class="option">
+                <input class="input" type="radio" name="btn" id="option3" value="1000">
+                <div class="btn">
+                    <span class="span">1000 km</span>
+                </div>
+            </div>
+        </div>
+
+
         <div id="shareButtonContainer">
             <a>Partager</a>
             <input type="checkbox" id="switch" /><label for="switch">Toggle</label>
@@ -41,7 +63,7 @@
         </div> <!-- Ici seront affichées les informations sur la piste actuelle -->
     </section>
     <section class="others-section">
-        <h1>Ce que les gens écoutent autour de vous :</h1>
+        <h1>Around you :</h1>
     </section>
     <section id="tracksList">
 
