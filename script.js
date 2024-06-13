@@ -9,7 +9,6 @@ import {
   doc,
   setDoc,
   updateDoc,
-  GeoPoint,
   query,
   where,
   getDocs,
@@ -46,8 +45,6 @@ let spotifyId;
 let userLink;
 let myLatitude;
 let myLongitude;
-let geoPoint;
-let nearbyUsers;
 
 // Code pour rediriger vers l'URL de Spotify si le code d'autorisation n'est pas déjà présent dans l'URL
 window.addEventListener("DOMContentLoaded", async () => {
@@ -55,7 +52,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   if (!window.location.href.includes("code=")) {
     // Vérifie si le code d'autorisation n'est pas déjà présent dans l'URL
     window.location.href =
-      "https://accounts.spotify.com/authorize?client_id=a1374b82376548cfa049d97b766d7d5c&response_type=code&redirect_uri=https://jeandoux.github.io/testapp&scope=user-read-private%20user-read-email%20user-read-currently-playing";
+      "https://accounts.spotify.com/authorize?client_id=adcf0a72b3c945d79fd63784ff471227&response_type=code&redirect_uri=http://127.0.0.1:5500/index.html&scope=user-read-private%20user-read-email%20user-read-currently-playing";
   }
   accessToken = sessionStorage.getItem("accessToken");
   console.log(accessToken);
@@ -80,7 +77,8 @@ window.addEventListener("DOMContentLoaded", async () => {
     updateCurrentTrack();
     // Appeler la fonction geolocation pour commencer à surveiller la position de l'utilisateur
     geolocation();
-    sendUserPositionsToServer();
+    // Démarrer la mise à jour périodique des utilisateurs à proximité
+    startNearbyUsersUpdate();
   } catch (error) {
     console.error("Erreur lors de la récupération du profil :", error);
   }
@@ -106,9 +104,9 @@ async function exchangeCodeForToken(code) {
     body: new URLSearchParams({
       grant_type: "authorization_code",
       code: code,
-      redirect_uri: "https://jeandoux.github.io/testapp",
-      client_id: "a1374b82376548cfa049d97b766d7d5c",
-      client_secret: "c551266bbd054acd84fed65769db2420",
+      redirect_uri: "http://127.0.0.1:5500/index.html",
+      client_id: "adcf0a72b3c945d79fd63784ff471227",
+      client_secret: "ea8c7bc86f2642d18e799e0ec9a0f8b2",
     }),
   });
 
@@ -146,10 +144,7 @@ async function sendUserToServer() {
 
   try {
     await setDoc(usersDocRef, data);
-    console.log(
-      "Utilisateur ajouté ou mis à jour avec l'ID Spotify :",
-      spotifyId
-    );
+    console.log("ECRITURE setDoc:", spotifyId);
   } catch (error) {
     console.error(
       "Erreur lors de l'ajout ou de la mise à jour de l'utilisateur :",
@@ -166,6 +161,8 @@ async function sendUserToServer() {
 }
 
 //--------------------------// DETECTION MUSIQUE UTILISATEUR ET AFFICHAGE //---------------------------------------------//
+
+let currentTrack = null; // Variable pour stocker la piste actuelle
 
 // Fonction pour récupérer la musique actuellement en cours de lecture
 async function getCurrentTrack(accessToken) {
@@ -186,6 +183,8 @@ async function getCurrentTrack(accessToken) {
     }
     // Vérifier si la réponse est vide
     if (response.status === 204) {
+      document.getElementById("noTrack").textContent =
+        "Aucune lecture en cours";
       console.log("Aucune lecture en cours.");
       return null; // Retourner null pour indiquer qu'aucune lecture n'est en cours
     }
@@ -201,92 +200,122 @@ async function getCurrentTrack(accessToken) {
   }
 }
 
+// Fonction pour extraire les informations pertinentes de la piste
+function getTrackInfo(trackData) {
+  if (!trackData || !trackData.item) return null;
+  return {
+    name: trackData.item.name,
+    artist: trackData.item.artists[0].name,
+    image: trackData.item.album.images[0].url,
+    musicLink: trackData.item.external_urls.spotify,
+    is_playing: trackData.is_playing,
+  };
+}
+
+// Fonction pour mettre à jour le DOM avec les informations de la piste
+function updateDOM(trackInfo) {
+  document.getElementById("noTrack").textContent = "";
+  document.getElementById("title").textContent = trackInfo.name;
+  document.getElementById("artist").textContent = trackInfo.artist;
+  document.getElementById("trackImage").src = trackInfo.image;
+  document.getElementById("trackLink").href = trackInfo.musicLink;
+  console.log("DOM updated");
+}
+
+// Fonction pour vider le DOM
+function clearDOM() {
+  document.getElementById("noTrack").textContent = "Aucune lecture en cours";
+  document.getElementById("title").textContent = "";
+  document.getElementById("artist").textContent = "";
+  document.getElementById("trackImage").src = "";
+  document.getElementById("trackLink").href = "";
+  console.log("DOM cleared");
+}
+
+// Fonction pour mettre à jour Firestore avec les informations de la piste
+async function updateFirestore(trackInfo) {
+  const { name, artist, image, musicLink } = trackInfo;
+  const fieldsToUpdate = {
+    name,
+    artist,
+    image,
+    musicLink,
+  };
+  await updateDoc(doc(db, "users", spotifyId), fieldsToUpdate)
+    .then(() => {
+      console.log("ECRITURE : Piste ajoutée ou mise à jour :", trackInfo);
+    })
+    .catch((error) => {
+      console.error(
+        "Erreur lors de l'ajout ou de la mise à jour de la piste :",
+        error
+      );
+    });
+}
+
+// Fonction pour vider les champs Firestore
+async function clearFirestore() {
+  const fieldsToDelete = {
+    name: null,
+    artist: null,
+    image: null,
+    musicLink: null,
+  };
+  await updateDoc(doc(db, "users", spotifyId), fieldsToDelete)
+    .then(() => {
+      console.log("ECRITURE : Champs supprimés avec succès !");
+    })
+    .catch((error) => {
+      console.error("Erreur lors de la suppression des champs :", error);
+    });
+}
+
 // Fonction pour actualiser périodiquement la musique actuelle
 async function updateCurrentTrack() {
   try {
     const trackData = await getCurrentTrack(accessToken);
-
-    // Si aucune piste n'est lue ou si le trackData est null, afficher "Aucune lecture en cours"
-    if (!trackData || !trackData.is_playing) {
-      document.getElementById("noTrack").textContent =
-        "Aucune lecture en cours";
-      //effacer les données de lecture précédentes
-      const trackElement = document.getElementById("title");
-      const artistElement = document.getElementById("artist");
-      const trackImageElement = document.getElementById("trackImage");
-      const spotifyLinkElement = document.getElementById("trackLink");
-
-      trackElement.textContent = "";
-      artistElement.textContent = "";
-      trackImageElement.src = "";
-      spotifyLinkElement.href = "";
-
-      const trackInfo = {
-        name: null,
-        artist: null,
-        image: null,
-        musicLink: null,
-      };
-      await updateDoc(doc(db, "users", spotifyId), trackInfo)
-        .then(() => {
-          console.log("Piste mise en pause :", trackInfo);
-        })
-        .catch((error) => {
-          console.error("Erreur lors de la mise en pause de la piste :", error);
-        });
-      // Réinitialiser les valeurs de name et artist à null si le bouton switch est désactivé
-    } else {
-      // Si une piste est trouvée
-      document.getElementById("noTrack").textContent = "";
-      const trackElement = document.getElementById("title");
-      const artistElement = document.getElementById("artist");
-      const trackImageElement = document.getElementById("trackImage");
-      const spotifyLinkElement = document.getElementById("trackLink");
-
-      trackElement.textContent = trackData.item.name;
-      artistElement.textContent = trackData.item.artists[0].name;
-      trackImageElement.src = trackData.item.album.images[0].url;
-      spotifyLinkElement.href = trackData.item.external_urls.spotify;
-    }
-    // Sélectionner l'élément input de type checkbox (le bouton de partage)
+    const newTrackInfo = getTrackInfo(trackData);
     const shareButton = document.getElementById("switch");
+    // Vérifier si la piste actuelle est différente de la piste précédente
+    if (JSON.stringify(currentTrack) !== JSON.stringify(newTrackInfo)) {
+      // Mettre à jour la piste actuelle
+      currentTrack = newTrackInfo;
 
-    // Vérifier si le bouton de partage est en position ON
-    if (shareButton.checked & trackData.is_playing) {
-      // Envoyer les informations sur la piste actuelle à Firestore
-      const trackInfo = {
-        name: trackData.item.name,
-        artist: trackData.item.artists[0].name,
-        image: trackData.item.album.images[0].url,
-        musicLink: trackData.item.external_urls.spotify,
-      };
-      // Enregistrez les données dans le document
-      await updateDoc(doc(db, "users", spotifyId), trackInfo)
-        .then(() => {
-          console.log("Piste ajoutée ou mise à jour :", trackInfo);
-        })
-        .catch((error) => {
-          console.error(
-            "Erreur lors de l'ajout ou de la mise à jour de la piste :",
-            error
-          );
-        });
+      // Si aucune piste n'est lue ou si le trackData est null, afficher "Aucune lecture en cours"
+      if (!trackData || !trackData.is_playing) {
+        clearDOM();
+        if (shareButton.checked) {
+          await clearFirestore();
+        }
+      } else {
+        // Si une piste est trouvée et en cours de lecture
+        updateDOM(newTrackInfo);
+        if (shareButton.checked) {
+          await updateFirestore(newTrackInfo);
+        }
+      }
     } else {
-      // Le bouton de partage est en position OFF, donc supprimez les informations sur la piste actuelle de Firestore
-      const fieldsToDelete = {
-        name: null,
-        artist: null,
-        image: null,
-        musicLink: null,
-        // Ajoutez d'autres champs à supprimer si nécessaire
-      };
-      await updateDoc(doc(db, "users", spotifyId), fieldsToDelete)
-        .then(() => {
-          console.log("Champs supprimés avec succès !");
-        })
-        .catch((error) => {
-          console.error("Erreur lors de la suppression des champs :", error);
-        }); // Supprimez les informations de piste de Firestore
+      console.log(
+        "La piste est la même que précédemment. Aucune mise à jour nécessaire."
+      );
+      // Gérer les changements d'état du bouton de partage
+      const wasShareButtonChecked =
+        shareButton.getAttribute("data-checked") === "true";
+      const isShareButtonChecked = shareButton.checked;
+
+      if (
+        isShareButtonChecked &&
+        !wasShareButtonChecked &&
+        trackData.is_playing
+      ) {
+        // Si le bouton est maintenant checked mais n'était pas checked avant
+        await updateFirestore(newTrackInfo);
+        shareButton.setAttribute("data-checked", "true");
+      } else if (!isShareButtonChecked && wasShareButtonChecked) {
+        // Si le bouton est maintenant unchecked mais était checked avant
+        await clearFirestore();
+        shareButton.setAttribute("data-checked", "false");
+      }
     }
   } catch (error) {
     console.error(
@@ -297,79 +326,116 @@ async function updateCurrentTrack() {
 }
 
 // Actualisez la piste actuelle toutes les 2 secondes
-setInterval(updateCurrentTrack, 2000);
+setInterval(updateCurrentTrack, 5000);
 
 //-----------------------------------------------//Envoie Géoloc et get users data proches//-------------------------------------------------//
 
-async function sendUserPositionsToServer() {
-  // Obtenez l'ID du document que vous souhaitez mettre à jour ou créer
-  const documentId = spotifyId; // Remplacez VOTRE_ID_DU_DOCUMENT par l'ID du document existant ou laissez-le vide pour créer un nouveau document
+// Variable pour stocker la dernière position envoyée au serveur
+let lastSentPosition = null;
 
-  // Référence au document dans la collection "position"
+// Fonction pour envoyer les positions utilisateur au serveur
+async function sendUserPositionsToServer() {
+  // Vérifier si la dernière position envoyée est différente de la nouvelle position
+  if (
+    lastSentPosition !== null &&
+    lastSentPosition.latitude === myLatitude &&
+    lastSentPosition.longitude === myLongitude
+  ) {
+    // Si la position n'a pas changé, quitter la fonction
+    return;
+  }
+
+  // Obtenez l'ID du document que vous souhaitez mettre à jour ou créer
+  const documentId = spotifyId; // Assurez-vous que `spotifyId` est défini et accessible
+
+  // Référence au document dans la collection "users"
   const usersDocRef = doc(db, "users", documentId);
 
   // Données à enregistrer dans le document
   const data = {
-    geoPoint: geoPoint,
+    latitude: myLatitude,
+    longitude: myLongitude,
   };
 
   // Enregistrez les données dans le document
   try {
     await updateDoc(usersDocRef, data);
     console.log(
-      "Position géographique ajoutée ou mise à jour avec ID :",
+      "ECRITURE : Position géographique ajoutée ou mise à jour avec ID :",
       documentId
     );
+    // Mettre à jour la dernière position envoyée
+    lastSentPosition = { latitude: myLatitude, longitude: myLongitude };
   } catch (error) {
     console.error(
       "Erreur lors de l'ajout ou de la mise à jour de la position géographique :",
       error
     );
   }
-
-  // Une fois la position mise à jour, récupérez les données des utilisateurs à moins d'1 km de votre position
-  getNearbyUsersData(myLatitude, myLongitude);
 }
 
-// Fonction pour récupérer les données d'écoute des utilisateurs à moins d'1 km de la position spécifiée
+let searchRadius = 1; // Par défaut 1 km
+
+function getSelectedRadius() {
+  const selectedOption = document.querySelector('input[name="btn"]:checked');
+  return parseInt(selectedOption.value);
+}
+
+document.querySelectorAll('input[name="btn"]').forEach((radio) => {
+  radio.addEventListener("change", () => {
+    searchRadius = getSelectedRadius();
+    console.log("Nouveau rayon de recherche :", searchRadius);
+  });
+});
+
 async function getNearbyUsersData(myLatitude, myLongitude) {
   try {
     const nearbyUsers = [];
 
-    // Requête Firestore pour récupérer les utilisateurs à moins d'1 km de la position spécifiée
-    const usersQuerySnapshot = await getDocs(collection(db, "users"));
+    // Créer une référence à la collection des utilisateurs
+    const usersCollectionRef = collection(db, "users");
 
-    usersQuerySnapshot.forEach((doc) => {
+    // Définir le rayon de recherche en mètres
+    const radiusInMeters = searchRadius * 1000; // Convertir km en mètres
+
+    // Convertir le rayon de recherche en degrés de latitude et de longitude
+    const radiusInDegreesLat = radiusInMeters / 111000; // Environ 111 km par degré de latitude
+    const radiusInDegreesLon =
+      radiusInMeters / (111000 * Math.cos((myLatitude * Math.PI) / 180)); // Ajustement pour la longitude
+
+    // Créer une requête pour rechercher les utilisateurs à proximité
+    const nearbyUsersQuery = query(
+      usersCollectionRef,
+      where("latitude", ">", myLatitude - radiusInDegreesLat),
+      where("latitude", "<", myLatitude + radiusInDegreesLat),
+      where("longitude", ">", myLongitude - radiusInDegreesLon),
+      where("longitude", "<", myLongitude + radiusInDegreesLon)
+    );
+
+    // Exécuter la requête
+    const querySnapshot = await getDocs(nearbyUsersQuery);
+
+    // Traiter les résultats de la requête
+    querySnapshot.forEach((doc) => {
       const userData = doc.data();
-      const userLatitude = userData.geoPoint.latitude;
-      const userLongitude = userData.geoPoint.longitude;
 
-      // Calculer la distance entre la position spécifiée et la position de l'utilisateur actuel
-      const distance = calculateDistance(
-        myLatitude,
-        myLongitude,
-        userLatitude,
-        userLongitude
-      );
-
-      // Si l'utilisateur est à moins d'1 km de la position spécifiée, récupérer ses données d'écoute
-      if (distance < 1000) {
-        const usersData = {
-          userId: doc.id,
-          user: userData.user,
-          userLink: userData.userLink,
-          distance: distance,
-          name: userData.name, // Ajout du champ "name"
-          artist: userData.artist, // Ajout du champ "artist"
-          spotifyUserId: userData.spotifyId,
-          image: userData.image,
-          musicLink: userData.musicLink,
-        };
-        nearbyUsers.push(usersData);
-      }
+      // Ajouter les données de l'utilisateur à la liste des utilisateurs à proximité
+      nearbyUsers.push({
+        userId: doc.id,
+        user: userData.user,
+        userLink: userData.userLink,
+        name: userData.name,
+        artist: userData.artist,
+        spotifyUserId: userData.spotifyId,
+        image: userData.image,
+        musicLink: userData.musicLink,
+      });
     });
 
-    console.log("Utilisateurs à moins d'1 km de votre position :", nearbyUsers);
+    console.log(
+      `LECTURE : Utilisateurs à moins de ${searchRadius} km de votre position :`,
+      nearbyUsers
+    );
     updateOthersTracks(nearbyUsers);
   } catch (error) {
     console.error(
@@ -379,23 +445,33 @@ async function getNearbyUsersData(myLatitude, myLongitude) {
   }
 }
 
-// Fonction pour calculer la distance entre deux points géographiques en kilomètres
-function calculateDistance(lat1, lon1, lat2, lon2) {
-  const R = 6371; // Rayon de la Terre en kilomètres
-  const dLat = (lat2 - lat1) * (Math.PI / 180); // Conversion en radians
-  const dLon = (lon2 - lon1) * (Math.PI / 180);
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1 * (Math.PI / 180)) *
-      Math.cos(lat2 * (Math.PI / 180)) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  const distance = R * c; // Distance en kilomètres
-  return distance;
+function startNearbyUsersUpdate() {
+  // Appeler les fonctions getNearbyUsersData et updateOthersTracks toutes les 5 secondes
+  setInterval(async () => {
+    if (
+      myLatitude !== undefined &&
+      myLongitude !== undefined &&
+      myLatitude !== null &&
+      myLongitude !== null
+    ) {
+      try {
+        await getNearbyUsersData(myLatitude, myLongitude);
+      } catch (error) {
+        console.error(
+          "Erreur lors de la mise à jour des utilisateurs à proximité :",
+          error
+        );
+      }
+    } else {
+      console.error("Latitude et longitude doivent être définies.");
+    }
+  }, 5000);
 }
-// Fonction pour mettre à jour les pistes des autres utilisateurs dans l'application
-function updateOthersTracks(nearbyUsers) {
+
+// Initialisation du rayon de recherche
+searchRadius = getSelectedRadius();
+
+async function updateOthersTracks(nearbyUsers) {
   const tracksList = document.getElementById("tracksList");
 
   console.log(
@@ -403,58 +479,53 @@ function updateOthersTracks(nearbyUsers) {
     nearbyUsers.length
   );
 
-  // Parcourir chaque utilisateur à moins d'1 km
+  const fragment = document.createDocumentFragment();
+
+  // Utiliser une Map pour suivre les éléments existants
+  const existingElements = new Map();
+  document.querySelectorAll(".user[data-spotify-id]").forEach((el) => {
+    existingElements.set(el.getAttribute("data-spotify-id"), el);
+  });
+
+  // Créer un Set pour suivre les utilisateurs actuellement détectés
+  const currentUserIds = new Set();
+
   nearbyUsers.forEach((user) => {
-    // Vérifier si name, artist et spotifyUserId ne sont pas null ou undefined
     if (user.spotifyUserId) {
-      // Vérifier si une div avec l'ID de l'utilisateur existe déjà
-      const existingUserDiv = document.querySelector(
-        `.user[data-spotify-id="${user.spotifyUserId}"]`
-      );
+      currentUserIds.add(user.spotifyUserId);
+      const existingUserDiv = existingElements.get(user.spotifyUserId);
 
-      console.log(
-        "Utilisateur :",
-        user.spotifyUserId,
-        " - Div existante :",
-        existingUserDiv
-      );
-
-      // Si une div pour cet utilisateur existe déjà
       if (existingUserDiv) {
-        // Si les données d'écoute sont null, supprimer la div existante
         if (user.name === null || user.artist === null || user.image === null) {
           console.log(
             "Suppression de la div pour l'utilisateur :",
             user.spotifyUserId
           );
           existingUserDiv.remove();
-        }
-        // Sinon, mettre à jour les données de la div existante
-        else {
+          existingElements.delete(user.spotifyUserId);
+        } else {
           console.log(
             "Mise à jour de la div pour l'utilisateur :",
             user.spotifyUserId
           );
-          // Mettez à jour les données de la div existante avec les nouvelles informations
           existingUserDiv.querySelector("#title").textContent = user.name;
           existingUserDiv.querySelector("#artist").textContent = user.artist;
           existingUserDiv.querySelector("#trackImage").src = user.image;
           existingUserDiv.querySelector("#userLink").href = user.userLink;
-          existingUserDiv.querySelector("#userLink").target = "_blank";
           existingUserDiv.querySelector("#userLink").textContent = user.user;
           existingUserDiv.querySelector("#trackLink").href = user.musicLink;
-          // existingUserDiv.querySelector("#trackImage").src = user.trackImageSrc;
         }
       } else if (
-        !existingUserDiv &&
         user.name !== null &&
+        user.name !== undefined &&
         user.artist !== null &&
-        user.image !== null
+        user.artist !== undefined &&
+        user.image !== null &&
+        user.image !== undefined
       ) {
-        // Si aucune div pour cet utilisateur n'existe, créer une nouvelle div
         const userContainer = document.createElement("div");
         userContainer.classList.add("user");
-        userContainer.setAttribute("data-spotify-id", user.spotifyUserId); // Ajouter l'attribut data-spotify-id
+        userContainer.setAttribute("data-spotify-id", user.spotifyUserId);
 
         const trackImageElement = document.createElement("img");
         trackImageElement.id = "trackImage";
@@ -464,7 +535,6 @@ function updateOthersTracks(nearbyUsers) {
         const trackInfoContainer = document.createElement("div");
         trackInfoContainer.id = "track";
 
-        // Ajouter le lien de la musique
         const trackLinkElement = document.createElement("a");
         trackLinkElement.id = "trackLink";
         trackLinkElement.href = user.musicLink;
@@ -478,16 +548,13 @@ function updateOthersTracks(nearbyUsers) {
         artistElement.id = "artist";
         artistElement.textContent = user.artist;
 
-        // Ajouter les éléments au conteneur de la piste
         trackInfoContainer.appendChild(trackLinkElement);
         trackLinkElement.appendChild(titleElement);
         trackLinkElement.appendChild(artistElement);
 
-        // Ajouter les éléments au conteneur utilisateur
         userContainer.appendChild(trackImageElement);
         userContainer.appendChild(trackInfoContainer);
 
-        // Créer la structure pour la section "écouté par"
         const listenedByDiv = document.createElement("div");
         listenedByDiv.id = "listenedBy";
 
@@ -496,7 +563,7 @@ function updateOthersTracks(nearbyUsers) {
 
         const userLinkButton = document.createElement("a");
         userLinkButton.classList.add("userLink-button");
-        userLinkButton.id = "userLink"; // Ajouter l'ID userLink
+        userLinkButton.id = "userLink";
         userLinkButton.href = user.userLink;
         userLinkButton.target = "_blank";
         userLinkButton.textContent = user.user;
@@ -504,10 +571,9 @@ function updateOthersTracks(nearbyUsers) {
         listenedByDiv.appendChild(listenedByText);
         listenedByDiv.appendChild(userLinkButton);
 
-        // Ajouter la structure pour la section "écouté par" au conteneur utilisateur
         userContainer.appendChild(listenedByDiv);
-        // Ajouter le conteneur utilisateur à la liste des pistes
-        tracksList.appendChild(userContainer);
+
+        fragment.appendChild(userContainer);
 
         console.log(
           "Nouvelle div créée pour l'utilisateur :",
@@ -516,6 +582,16 @@ function updateOthersTracks(nearbyUsers) {
       }
     }
   });
+
+  // Supprimer les divs des utilisateurs qui ne sont plus détectés
+  existingElements.forEach((element, spotifyUserId) => {
+    if (!currentUserIds.has(spotifyUserId)) {
+      console.log("Suppression de la div pour l'utilisateur : ", spotifyUserId);
+      element.remove();
+    }
+  });
+
+  tracksList.appendChild(fragment);
 }
 
 //-----------------------------------------//GEOLOC//------------------------------------------//
@@ -524,24 +600,51 @@ function updateOthersTracks(nearbyUsers) {
 async function successCallback(position) {
   myLatitude = position.coords.latitude;
   myLongitude = position.coords.longitude;
-  // Mettre à jour l'instance de GeoPoint avec les nouvelles valeurs de latitude et de longitude
-  geoPoint = new GeoPoint(myLatitude, myLongitude);
-  console.log(geoPoint);
 
-  // Le reste du traitement de la position peut être ajouté ici
+  console.log("Latitude:", myLatitude, "Longitude:", myLongitude);
+
+  // Appeler la fonction pour envoyer les positions utilisateur au serveur
+  await sendUserPositionsToServer();
 }
+
 // Fonction de callback pour traiter les erreurs de géolocalisation
 function errorCallback(error) {
   console.error("Erreur de géolocalisation :", error.message);
 }
+
+// Fonction pour obtenir immédiatement la position actuelle
+function getCurrentPosition() {
+  // Options pour la demande de position de l'utilisateur
+  const options = {
+    enableHighAccuracy: true, // Activer une précision élevée si possible
+    timeout: 5000, // Durée maximale (en ms) avant que la demande de position ne soit considérée comme expirée
+    maximumAge: 0, // Durée maximale (en ms) pendant laquelle la position est considérée comme valide
+  };
+
+  // Vérifier si la géolocalisation est prise en charge par le navigateur
+  if (navigator.geolocation) {
+    // Obtenir immédiatement la position actuelle de l'utilisateur
+    navigator.geolocation.getCurrentPosition(
+      successCallback,
+      errorCallback,
+      options
+    );
+  } else {
+    console.error(
+      "La géolocalisation n'est pas prise en charge par ce navigateur."
+    );
+  }
+}
+
 // Appeler la fonction watchPosition pour surveiller la position de l'utilisateur
-function geolocation() {
+function watchPosition() {
   // Options pour la surveillance de la position de l'utilisateur
   const options = {
     enableHighAccuracy: true, // Activer une précision élevée si possible
     timeout: 5000, // Durée maximale (en ms) avant que la demande de position ne soit considérée comme expirée
     maximumAge: 0, // Durée maximale (en ms) pendant laquelle la position est considérée comme valide
   };
+
   // Vérifier si la géolocalisation est prise en charge par le navigateur
   if (navigator.geolocation) {
     // Commencer à surveiller la position de l'utilisateur
@@ -557,5 +660,10 @@ function geolocation() {
   }
 }
 
-// Appeler la fonction sendUserPositionsToServer toutes les 5 secondes
-setInterval(sendUserPositionsToServer, 2000);
+// Fonction pour initialiser la géolocalisation
+function geolocation() {
+  // Obtenir immédiatement la position actuelle
+  getCurrentPosition();
+  // Commencer à surveiller la position de l'utilisateur
+  watchPosition();
+}
