@@ -17,7 +17,8 @@ body {
 
 header {
   background-color: #000; /* Noir */
-  padding: 20px;
+  
+  font-family: "Arial", sans-serif;
 }
 
 .top-bar {
@@ -25,18 +26,25 @@ header {
   justify-content: space-between;
   align-items: center;
 }
+.logo{
+  font-size: 40px;
+  display: flex;
+  align-items: center;
 
-.logo {
-  color: #fff;
-  font-size: 24px;
+}
+.logo img {
+  margin-left: 200px;
+  width: 150px;
+  height: auto;
 }
 
 .login-button {
   color: #fff;
-  background-color: #1db954; /* Vert Spotify */
+  background: linear-gradient(180deg, #1db954, #74bbad);
   padding: 10px 20px;
   border-radius: 20px;
   cursor: pointer;
+  margin-right: 200px;
 }
 .userLink-button {
   color: #fff;
@@ -53,15 +61,16 @@ header {
   font-size: 30px; /* Taille de police plus grande */
   font-family: "Arial", sans-serif; /* Police de caractères */
   padding: 10px; /* Espacement interne */
-  background-color: #1db954; /* Couleur de fond verte */
+  background: linear-gradient(180deg, #1db954, #74bbad);
   color: #fff; /* Couleur du texte blanc */
   border-radius: 10px; /* Coins arrondis */
-  margin-left: 20px;
-  margin-right: 20px;
+  margin-left: 100px;
+  margin-right: 100px;
 }
 #trackImage {
   max-width: 100px;
   height: auto;
+  border-radius: 10px;
 }
 
 #track {
@@ -86,12 +95,12 @@ header {
     font-size: 30px; /* Taille de police plus grande */
     font-family: "Arial", sans-serif; /* Police de caractères */
     padding: 10px; /* Espacement interne */
-    background-color: #1db954; /* Couleur de fond verte */
+    background: linear-gradient(180deg, #1db954, #74bbad);
     color: #fff; /* Couleur du texte blanc */
     border-radius: 10px; /* Coins arrondis */
     margin-bottom: 10px; /* Marge inférieure pour séparer les utilisateurs */
-    margin-left: 20px;
-    margin-right: 20px;
+    margin-left: 100px;
+    margin-right: 100px;
   }
   a {
     text-decoration: none; /* Supprime le soulignage */
@@ -100,6 +109,8 @@ header {
 h1,
 h2 {
   color: #fff;
+  margin-left: 200px;
+  font-size: 30px;
 }
 
 footer {
@@ -136,6 +147,7 @@ footer {
   justify-content: space-between;
   align-items: center;
   position: relative;
+  margin-right: 200px;
 }
 
 /* Styles pour le bouton de partage */
@@ -145,6 +157,7 @@ footer {
   color: #fff; /* Couleur du texte blanc */
   text-decoration: none; /* Supprimer soulignement */
   cursor: pointer;
+  
 }
 
 input[type="checkbox"] {
@@ -177,7 +190,7 @@ label:after {
 }
 
 input:checked + label {
-  background: #1db954;
+  background: linear-gradient(180deg, #1db954, #74bbad);
 }
 
 input:checked + label:after {
@@ -187,4 +200,61 @@ input:checked + label:after {
 
 label:active:after {
   width: 35px;
+}
+
+/* Slider */
+.wrapper {
+  --font-color-dark: #323232;
+  --font-color-light: #FFF;
+  --bg-color: grey;
+  --main-color: #323232;
+  position: relative;
+  width: 250px;
+  height: 36px;
+  background-color: var(--bg-color);
+  border: 2px solid var(--main-color);
+  border-radius: 34px;
+  display: flex;
+  flex-direction: row;
+  box-shadow: 4px 4px var(--main-color);
+}
+
+.option {
+  width: 80.5px;
+  height: 28px;
+  position: relative;
+  top: 2px;
+  left: 2px;
+}
+
+.input {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  left: 0;
+  top: 0;
+  appearance: none;
+  cursor: pointer;
+}
+
+.btn {
+  width: 100%;
+  height: 100%;
+  background-color: var(--bg-color);
+  border-radius: 50px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.span {
+  color: var(--font-color-dark);
+}
+
+.input:checked + .btn {
+  background-color: var(--main-color);
+}
+
+.input:checked + .btn .span {
+  color: var(--font-color-light);
 }
