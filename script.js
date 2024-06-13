@@ -105,8 +105,8 @@ async function exchangeCodeForToken(code) {
       grant_type: "authorization_code",
       code: code,
       redirect_uri: "http://127.0.0.1:5500/index.html",
-      client_id: "adcf0a72b3c945d79fd63784ff471227",
-      client_secret: "ea8c7bc86f2642d18e799e0ec9a0f8b2",
+      client_id: "a1374b82376548cfa049d97b766d7d5c",
+      client_secret: "c551266bbd054acd84fed65769db2420",
     }),
   });
 
