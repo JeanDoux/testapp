@@ -52,7 +52,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   if (!window.location.href.includes("code=")) {
     // Vérifie si le code d'autorisation n'est pas déjà présent dans l'URL
     window.location.href =
-      "https://accounts.spotify.com/authorize?client_id=adcf0a72b3c945d79fd63784ff471227&response_type=code&redirect_uri=http://127.0.0.1:5500/index.html&scope=user-read-private%20user-read-email%20user-read-currently-playing";
+      "https://accounts.spotify.com/authorize?client_id=adcf0a72b3c945d79fd63784ff471227&response_type=code&redirect_uri=http://https://jeandoux.github.io/testapp/&scope=user-read-private%20user-read-email%20user-read-currently-playing";
   }
   accessToken = sessionStorage.getItem("accessToken");
   console.log(accessToken);
