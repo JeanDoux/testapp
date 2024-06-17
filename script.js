@@ -84,6 +84,15 @@ window.addEventListener("DOMContentLoaded", async () => {
   }
 });
 
+window.addEventListener("beforeunload", (event) => {
+  // Appeler clearFirestore sans await
+  clearFirestore();
+  // Ajouter une confirmation pour le déchargement de la page
+  event.preventDefault();
+  event.returnValue = ""; // Nécessaire pour certaines versions de Chrome
+});
+
+
 // Fonction pour extraire le code d'autorisation de l'URL de redirection
 async function getCodeFromURL() {
   console.log("Extraction du code d'autorisation de l'URL de redirection");
